@@ -82,7 +82,9 @@ class SUMNetbyET(nn.Module):
         unpool1 = torch.cat([self.unpool1(donv2, idxs1), conv1], 1)
         donv1 = F.relu(self.donv1(unpool1), inplace=True)
         gap = torch.sigmoid(self.relu_conv1(F.relu(self.gap_conv1(self.gap(egm_guidance)), inplace=True)))
-        output = self.output(donv1 * gap)
+        donv1_gap = torch.mul(donv1,gap)
+        donv1_add = torch.add(donv1,donv1_gap)
+        output = self.output(donv1_add)
         return torch.sigmoid(output), torch.sigmoid(egm_output)
 
 

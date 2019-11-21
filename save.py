@@ -15,7 +15,7 @@ from ETNet import ETNet
 from SUMNetbyET import SUMNetbyET
 
 net = SUMNetbyET()
-net.load_state_dict(torch.load('SUMNetbyET_gap_pre.pt'))
+net.load_state_dict(torch.load('SUMNetbyET.pt'))
 net.eval()
 net = net.cuda()
 
@@ -70,4 +70,4 @@ for data in validDataLoader:
     preds = (preds > 0.5)*1
     plot_n_save(images.cpu().detach().numpy(), labels.cpu().detach().numpy(), preds, j)
     i = i+1
-    j = 16*i
+    j = 10*i

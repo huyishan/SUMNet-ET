@@ -42,7 +42,7 @@ criterion = nn.BCELoss()
 def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion, use_gpu):
     i = 0
     j = 0
-    epochs = 50
+    epochs = 30
     trainLoss = []
     validLoss = []
     trainDiceCoeff = []
@@ -67,7 +67,7 @@ def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion
                 inputs = inputs.cuda()
                 labels = labels.cuda()
             probs,preimg = net(inputs)
-            loss = 0.8*criterion(probs.view(-1), labels.view(-1)) + 0.2*criterion(preimg.view(-1), labels.view(-1))
+            loss = 0.9*criterion(probs.view(-1), labels.view(-1)) + 0.1*criterion(preimg.view(-1), labels.view(-1))
             preds = (probs > 0.5).float()
             # ispreds_0 = torch.nonzero(preds)
             optimizer.zero_grad()

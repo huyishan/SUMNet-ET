@@ -50,8 +50,8 @@ def data_loaders(images_dir, labels_dir, bs = 12):
     labels_files_list = os.listdir(labels_dir)
     images_files_list.sort()
     labels_files_list.sort()
-    trainimages_files_list = images_files_list[:10]
-    trainlabels_files_list = labels_files_list[:10]
+    trainimages_files_list = images_files_list[:15]
+    trainlabels_files_list = labels_files_list[:15]
     validimages_files_list = images_files_list[15:16]
     validlabels_files_list = labels_files_list[15:16]
     trainimages_batches, trainlabels_batches = extract_data(images_dir, trainimages_files_list, labels_dir, trainlabels_files_list, is_train = True)
