@@ -14,7 +14,6 @@ from torchvision import models
 class SUMNet(nn.Module):
     def __init__(self):
         super(SUMNet, self).__init__()
-
         self.encoder = models.vgg11(pretrained=True).features
         self.preconv = nn.Conv2d(1, 3, 1)
         self.conv1 = self.encoder[0]

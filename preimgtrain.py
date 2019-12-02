@@ -21,32 +21,49 @@ from utils import dice_coefficient, make_loader
 from ETNet import ETNet
 from visualize import Visualizer
 import cv2
-from SUMNetbyresidual import SUMNetbyersidual
 
-import pytorch_iou
+from dataset import USDataset
+import os
+from torch.utils.data import DataLoader
 
-images_dir = '/home/data/huyishan/ThyroidData/data/'
-labels_dir = '/home/data/huyishan/ThyroidData/groundtruth/'
-trainDataLoader, validDataLoader = data_loaders(images_dir, labels_dir, bs=5)
+
+def file_name(file_dir):
+    L=[]
+    for root, dirs, files in os.walk(file_dir):
+        for file in files:
+            if os.path.splitext(file)[1] == '.jpg':
+                L.append(file)
+    return L
+
+trainimgnamelist = file_name("/home/data/huyishan/predata_thyroid/train/data")
+testimgnamelist = file_name("/home/data/huyishan/predata_thyroid/test/data")
+root = "/home/data/huyishan/predata_thyroid/"
+
+traindataset = USDataset(root=root,filename=trainimgnamelist,mode='train')
+testdataset = USDataset(root=root,filename=testimgnamelist,mode='test')
+
+traindl = DataLoader(traindataset,batch_size=10,shuffle=True,num_workers=2,pin_memory = True)
+testdl = DataLoader(testdataset,batch_size=10,shuffle=False,num_workers=2,pin_memory = True)
+
+# dl_data = iter(testdl)
+# print(next(dl_data))
 
 vis = Visualizer('net-loss')
-
-net = SUMNetbyersidual(1)
-net.load_state_dict(torch.load('SUMNetbyresidual_1_10.pt'))
-use_gpu = torch.cuda.is_available()
+net = SUMNet()
+# use_gpu = torch.cuda.is_available()
+use_gpu = True
 if use_gpu:
     net = net.cuda()
-optimizer = optim.Adam(net.parameters(), lr=1e-4)
+optimizer = optim.Adam(net.parameters(), lr=1e-3)
 lr_schduler = optim.lr_scheduler.StepLR(optimizer,step_size=500,gamma = 0.8)
 criterion = nn.BCELoss()
-bce_loss = nn.BCELoss(size_average=True)
-iou_loss = pytorch_iou.IOU(size_average=True)
+
 
 
 def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion, use_gpu):
     i = 0
     j = 0
-    epochs = 10
+    epochs = 20
     trainLoss = []
     validLoss = []
     trainDiceCoeff = []
@@ -66,7 +83,7 @@ def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion
         bar = tqdm.tqdm(trainDataLoader)
         for data in bar:
             inputs, labels = data
-            # islabels_0 = torch.nonzero(labels)
+#             # islabels_0 = torch.nonzero(labels)
             if use_gpu:
                 inputs = inputs.cuda()
                 labels = labels.cuda()
@@ -77,13 +94,6 @@ def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            # scheduler.step()
-            # if(epoch==5):
-            #     plot_n_save(inputs.cpu().detach().numpy(), labels.cpu().detach().numpy(), preimg.cpu().detach().numpy(), j)
-            #     j = i*10
-            #     i = i+1
-            # if(epoch>5):
-            #     return
             trainRunningLoss += loss.item()
             trainDice += dice_coefficient(preds, labels).item()
             trainBatches += 1
@@ -92,7 +102,7 @@ def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion
             bar.set_postfix(loss=loss.item())
         if epoch>0 and epoch%5==0:
             for p in optimizer.param_groups:
-                p['lr'] *= 0.8
+                p['lr'] *= 0.5
         trainLoss.append(trainRunningLoss / trainBatches)
         trainDiceCoeff.append(trainDice / trainBatches)
 
@@ -112,7 +122,7 @@ def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion
         validDiceCoeff.append(validDice / validBatches)
         if validDice >= bestValidDice:
             bestValidDice = validDice
-            torch.save(net.state_dict(), 'SUMNetbyresidual.pt')
+            torch.save(net.state_dict(), 'SUMNet_3channel.pt')
         epochEnd = time.time() - epochStart
         print('Epoch: {:.0f}/{:.0f} | Train Loss: {:.3f} | Valid Loss: {:.3f} | Train Dice: {:.3f} | Valid Dice: {:.3f}' \
               .format(epoch + 1, epochs, trainRunningLoss / trainBatches, validRunningLoss / validBatches,
@@ -129,5 +139,6 @@ def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion
     return DF
 
 
-DF = train(trainDataLoader, validDataLoader, net, optimizer,lr_schduler, criterion, use_gpu)
-DF.to_csv('SUMNetbyresidual.csv')
+
+DF = train(traindl, testdl, net, optimizer,lr_schduler, criterion, use_gpu)
+DF.to_csv('SUMNetbyET.csv')

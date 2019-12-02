@@ -13,19 +13,31 @@ from get_data_loader import data_loaders
 from ETNet import ETNet
 from SUMNetbyET import SUMNetbyET
 
-from SUMNetbyresidual import SUMNetbyersidual
+import os
+from  dataset import USDataset
+from torch.utils.data import DataLoader
+import tqdm
+import time
 
-net = SUMNetbyersidual(1)
-net.load_state_dict(torch.load('SUMNetbyresidual.pt'))
+net = SUMNet()
+net.load_state_dict(torch.load('SUMNet_3channel.pt'))
 net.eval()
 net = net.cuda()
 
-images_dir = '/home/data/huyishan/ThyroidData/data/'
-labels_dir = '/home/data/huyishan/ThyroidData/groundtruth/'
-trainDataLoader, validDataLoader = data_loaders(images_dir, labels_dir, bs = 5)
+def file_name(file_dir):
+    L=[]
+    for root, dirs, files in os.walk(file_dir):
+        for file in files:
+            if os.path.splitext(file)[1] == '.jpg':
+                L.append(file)
+    return L
 
-j = 0
-i = 0
+testimgnamelist = file_name("/home/data/huyishan/predata_thyroid/test/data")
+root = "/home/data/huyishan/predata_thyroid/"
+testdataset = USDataset(root=root,filename=testimgnamelist,mode='test')
+
+testdl = DataLoader(testdataset,batch_size=10,shuffle=False,num_workers=2,pin_memory = True)
+
 def plot_n_save(images, labels, preds, j):
     num = images.shape[0]
     images = images*255
@@ -41,15 +53,15 @@ def plot_n_save(images, labels, preds, j):
         contours_label = cv2.findContours(thresh_label, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
         contours_pred = cv2.findContours(thresh_pred, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0]
         image_rgb = np.empty((256, 384, 3), dtype ='uint8')
-        image_rgb[:, :, 0] = image
-        image_rgb[:, :, 1] = image
-        image_rgb[:, :, 2] = image
+        image_rgb[:, :, 0] = images[i][0]
+        image_rgb[:, :, 1] = images[i][1]
+        image_rgb[:, :, 2] = images[i][2]
         result = cv2.drawContours(image_rgb, contours_label, -1, (0,255,0), 1)
         result = result.astype('uint8')
         result = cv2.drawContours(result, contours_pred, -1, (255,0,0), 1)
-        name1 = 'SUMNet/16/results/'+str(j)+'.png'
-        name2 = 'SUMNet/16/gt/'+str(j)+'.png'
-        name3 = 'SUMNet/16/preds/'+str(j)+'.png'
+        name1 = './SUMNet/16/results/'+str(j)+'.png'
+        name2 = './SUMNet/16/gt/'+str(j)+'.png'
+        name3 = './SUMNet/16/preds/'+str(j)+'.png'
         kernel = np.ones((5, 5),np.uint8)
         label_erode = cv2.erode(label,kernel,iterations = 1)
         result_label = (label - label_erode)*255
@@ -61,7 +73,11 @@ def plot_n_save(images, labels, preds, j):
         cv2.imwrite(name3, result_pred)
     return
 
-for data in validDataLoader:
+
+j = 0
+i = 0
+bar = tqdm.tqdm(testdl)
+for data in bar:
     images, labels = data
     images = images.cuda()
     labels = labels.cuda()
@@ -71,4 +87,4 @@ for data in validDataLoader:
     preds = (preds > 0.5)*1
     plot_n_save(images.cpu().detach().numpy(), labels.cpu().detach().numpy(), preds, j)
     i = i+1
-    j = 5*i
+    j = 10*i
