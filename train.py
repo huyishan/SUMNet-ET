@@ -21,18 +21,48 @@ from utils import dice_coefficient, make_loader
 from ETNet import ETNet
 from visualize import Visualizer
 import cv2
-from SUMNetbyresidual import SUMNetbyersidual
+from BASNet import BASNet
 
 import pytorch_iou
+import pytorch_ssim
 
 images_dir = '/home/data/huyishan/ThyroidData/data/'
 labels_dir = '/home/data/huyishan/ThyroidData/groundtruth/'
 trainDataLoader, validDataLoader = data_loaders(images_dir, labels_dir, bs=5)
 
+def bce_ssim_loss(pred,target):
+
+	bce_out = bce_loss(pred,target)
+	ssim_out = 1 - ssim_loss(pred,target)
+	iou_out = iou_loss(pred,target)
+
+	loss = bce_out + ssim_out + iou_out
+
+	return loss
+
+ssim_loss = pytorch_ssim.SSIM(window_size=11,size_average=True)
+
+def muti_bce_loss_fusion(d0, d1, d2, d3, d4, d5, d6, d7, labels_v):
+
+	loss0 = bce_ssim_loss(d0,labels_v)
+	loss1 = bce_ssim_loss(d1,labels_v)
+	loss2 = bce_ssim_loss(d2,labels_v)
+	loss3 = bce_ssim_loss(d3,labels_v)
+	loss4 = bce_ssim_loss(d4,labels_v)
+	loss5 = bce_ssim_loss(d5,labels_v)
+	loss6 = bce_ssim_loss(d6,labels_v)
+	loss7 = bce_ssim_loss(d7,labels_v)
+	#ssim0 = 1 - ssim_loss(d0,labels_v)
+
+	# iou0 = iou_loss(d0,labels_v)
+	#loss = torch.pow(torch.mean(torch.abs(labels_v-d0)),2)*(5.0*loss0 + loss1 + loss2 + loss3 + loss4 + loss5) #+ 5.0*lossa
+	loss = loss0 + loss1 + loss2 + loss3 + loss4 + loss5 + loss6 + loss7#+ 5.0*lossa
+	return loss0, loss
+
+
 vis = Visualizer('net-loss')
 
-net = SUMNetbyersidual(1)
-net.load_state_dict(torch.load('SUMNetbyresidual_1_10.pt'))
+net = BASNet(1)
 use_gpu = torch.cuda.is_available()
 if use_gpu:
     net = net.cuda()
@@ -70,20 +100,19 @@ def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion
             if use_gpu:
                 inputs = inputs.cuda()
                 labels = labels.cuda()
-            probs = net(inputs)
-            loss = criterion(probs.view(-1), labels.view(-1))
-            preds = (probs > 0.5).float()
+            d0, d1, d2, d3, d4, d5, d6, d7 = net(inputs)
+            loss2, loss = muti_bce_loss_fusion(d0, d1, d2, d3, d4, d5, d6, d7, labels)
+            preds = (d0 > 0.5).float()
+
+            # probs = net(inputs)
+            # loss = criterion(probs.view(-1), labels.view(-1))
+
+            # preds = (probs > 0.5).float()
             # ispreds_0 = torch.nonzero(preds)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            # scheduler.step()
-            # if(epoch==5):
-            #     plot_n_save(inputs.cpu().detach().numpy(), labels.cpu().detach().numpy(), preimg.cpu().detach().numpy(), j)
-            #     j = i*10
-            #     i = i+1
-            # if(epoch>5):
-            #     return
+
             trainRunningLoss += loss.item()
             trainDice += dice_coefficient(preds, labels).item()
             trainBatches += 1
@@ -102,9 +131,14 @@ def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion
             if use_gpu:
                 inputs = inputs.cuda()
                 labels = labels.cuda()
-            probs = net(inputs)
-            loss = criterion(probs.view(-1), labels.view(-1))
-            preds = (probs > 0.5).float()
+
+            d0, d1, d2, d3, d4, d5, d6, d7 = net(inputs)
+            loss2, loss = muti_bce_loss_fusion(d0, d1, d2, d3, d4, d5, d6, d7, labels)
+            preds = (d0 > 0.5).float()
+
+            # probs = net(inputs)
+            # loss = criterion(probs.view(-1), labels.view(-1))
+            # preds = (probs > 0.5).float()
             validDice += dice_coefficient(preds, labels).item()
             validRunningLoss += loss.item()
             validBatches += 1
@@ -112,7 +146,7 @@ def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion
         validDiceCoeff.append(validDice / validBatches)
         if validDice >= bestValidDice:
             bestValidDice = validDice
-            torch.save(net.state_dict(), 'SUMNetbyresidual.pt')
+            torch.save(net.state_dict(), 'BASNet.pt')
         epochEnd = time.time() - epochStart
         print('Epoch: {:.0f}/{:.0f} | Train Loss: {:.3f} | Valid Loss: {:.3f} | Train Dice: {:.3f} | Valid Dice: {:.3f}' \
               .format(epoch + 1, epochs, trainRunningLoss / trainBatches, validRunningLoss / validBatches,
@@ -130,4 +164,4 @@ def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion
 
 
 DF = train(trainDataLoader, validDataLoader, net, optimizer,lr_schduler, criterion, use_gpu)
-DF.to_csv('SUMNetbyresidual.csv')
+DF.to_csv('BASNet.csv')

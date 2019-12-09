@@ -13,10 +13,10 @@ from get_data_loader import data_loaders
 from ETNet import ETNet
 from SUMNetbyET import SUMNetbyET
 
-from SUMNetbyresidual import SUMNetbyersidual
+from BASNet import BASNet
 
-net = SUMNetbyersidual(1)
-net.load_state_dict(torch.load('SUMNetbyresidual.pt'))
+net = BASNet(1)
+net.load_state_dict(torch.load('BASNet.pt'))
 net.eval()
 net = net.cuda()
 
@@ -65,7 +65,10 @@ for data in validDataLoader:
     images, labels = data
     images = images.cuda()
     labels = labels.cuda()
-    logits = net(images)
+    # logits = net(images)
+
+    d1, d2, d3, d4, d5, d6, d7, d8 = net(images)
+    logits = d1
 
     preds = logits.cpu().detach().numpy()
     preds = (preds > 0.5)*1
