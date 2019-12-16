@@ -67,7 +67,7 @@ for data in validDataLoader:
     labels = labels.cuda()
     # logits = net(images)
 
-    d1, d2, d3, d4, d5, d6, d7, d8 = net(images)
+    d1 = net(images)
     logits = d1
 
     preds = logits.cpu().detach().numpy()

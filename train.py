@@ -100,8 +100,9 @@ def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion
             if use_gpu:
                 inputs = inputs.cuda()
                 labels = labels.cuda()
-            d0, d1, d2, d3, d4, d5, d6, d7 = net(inputs)
-            loss2, loss = muti_bce_loss_fusion(d0, d1, d2, d3, d4, d5, d6, d7, labels)
+            d0 = net(inputs)
+            loss = bce_ssim_loss(d0,labels)
+            # loss2, loss = muti_bce_loss_fusion(d0, d1, d2, d3, d4, d5, d6, d7, labels)
             preds = (d0 > 0.5).float()
 
             # probs = net(inputs)
@@ -132,8 +133,9 @@ def train(trainDataLoader, validDataLoader, net, optimizer, scheduler, criterion
                 inputs = inputs.cuda()
                 labels = labels.cuda()
 
-            d0, d1, d2, d3, d4, d5, d6, d7 = net(inputs)
-            loss2, loss = muti_bce_loss_fusion(d0, d1, d2, d3, d4, d5, d6, d7, labels)
+            d0= net(inputs)
+            loss = bce_ssim_loss(d0,labels)
+            # loss2, loss = muti_bce_loss_fusion(d0, d1, d2, d3, d4, d5, d6, d7, labels)
             preds = (d0 > 0.5).float()
 
             # probs = net(inputs)

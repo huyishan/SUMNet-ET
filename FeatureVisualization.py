@@ -22,15 +22,15 @@ class FeatureVisualization():
         if listlength>1:
             for i in range(listlength -1):
                 for name, layer in layer_model._modules.items():
-                    x = layer(x)
                     if name == self.selected_layer[i]:
                         layer_model = layer_model._modules[self.selected_layer[i]]
                         break
+                    x = layer(x)
 
         for name,layer in layer_model._modules.items():
-            x = layer(x)
             if name == self.selected_layer[-1]:
                 return x
+            x = layer(x)
 
 
     def save_features_to_imgs(self):
@@ -42,8 +42,8 @@ class FeatureVisualization():
             feature = feature.view(feature.shape[1], feature.shape[2])
             feature = self.get_single_feature()
             feature = feature.data.cpu().detach().numpy()
-            feature = 1.0/(1+np.exp(-1*feature))
-            feature = np.round(feature*255)
+            # feature = 1.0/(1+np.exp(-1*feature))
+            # feature = np.round(feature*255)
             show_feature.append(feature)
         return show_feature
 
@@ -57,8 +57,8 @@ class FeatureVisualization():
         # to numpy
         feature = self.get_single_feature()
         feature = feature.data.numpy()
-        feature = 1.0 / (1 + np.exp(-1 * feature))
-        feature = np.round(feature * 255)
+        # feature = 1.0 / (1 + np.exp(-1 * feature))
+        # feature = np.round(feature * 255)
         print(feature[0])
         cv.imwrite('./featureimg.jpg', feature)
 
@@ -86,7 +86,7 @@ labels_vol = labels_vol[begin:n-end+1]
 # 获取网络模型参数
 from BASNet import BASNet
 net = BASNet(1)
-net.load_state_dict(torch.load('BASNet.pt'))
+net.load_state_dict(torch.load('BASNet_CENet.pt'))
 net.eval()
 print(net)
 net = net.cuda()
@@ -108,9 +108,9 @@ x = len(fearure_imgs)/5
 y = 5
 plt.figure(figsize=(15,10)) #设置窗口大小
 for i in range(1,len(fearure_imgs)+1):
-    cv.imwrite("result/feature/feature_"+netnamelist[-1]+"_"+str(i)+".jpg", fearure_imgs[i-1])
+    # cv.imwrite("result/feature/feature_"+netnamelist[-1]+"_"+str(i)+".jpg", fearure_imgs[i-1])
     plt.subplot(x,y,i)
-    plt.imshow(fearure_imgs[i-1])
+    plt.imshow(fearure_imgs[i-1],cmap='gray')
     plt.axis('off')
 plt.show()
 print("")

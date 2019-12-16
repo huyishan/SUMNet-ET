@@ -11,6 +11,7 @@ import torch.nn.functional as F
 from torchvision import models
 from resnet_model import *
 
+# 粗分割细化分割结果
 class RefUnet(nn.Module):
     def __init__(self,in_ch,inc_ch):
         super(RefUnet, self).__init__()
@@ -106,6 +107,54 @@ class RefUnet(nn.Module):
 
         return x + residual
 
+#-------------------2019.12.9--------------------#
+from functools import partial
+nonlinearity = partial(F.relu, inplace=True)
+# CE-Net密集空洞卷积层
+class DACblock(nn.Module):
+    def __init__(self, channel):
+        super(DACblock, self).__init__()
+        self.dilate1 = nn.Conv2d(channel, channel, kernel_size=3, dilation=1, padding=1)
+        self.dilate2 = nn.Conv2d(channel, channel, kernel_size=3, dilation=3, padding=3)
+        self.dilate3 = nn.Conv2d(channel, channel, kernel_size=3, dilation=5, padding=5)
+        self.conv1x1 = nn.Conv2d(channel, channel, kernel_size=1, dilation=1, padding=0)
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
+                if m.bias is not None:
+                    m.bias.data.zero_()
+
+    def forward(self, x):
+        dilate1_out = nonlinearity(self.dilate1(x))
+        dilate2_out = nonlinearity(self.conv1x1(self.dilate2(x)))
+        dilate3_out = nonlinearity(self.conv1x1(self.dilate2(self.dilate1(x))))
+        dilate4_out = nonlinearity(self.conv1x1(self.dilate3(self.dilate2(self.dilate1(x)))))
+        out = x + dilate1_out + dilate2_out + dilate3_out + dilate4_out
+        return out
+# CE-Net特征金字塔池化层
+class SPPblock(nn.Module):
+    def __init__(self, in_channels):
+        super(SPPblock, self).__init__()
+        self.pool1 = nn.MaxPool2d(kernel_size=[2, 2], stride=2)
+        self.pool2 = nn.MaxPool2d(kernel_size=[3, 3], stride=3)
+        self.pool3 = nn.MaxPool2d(kernel_size=[5, 5], stride=5)
+        self.pool4 = nn.MaxPool2d(kernel_size=[6, 6], stride=6)
+
+        self.conv = nn.Conv2d(in_channels=in_channels, out_channels=1, kernel_size=1, padding=0)
+        self.addaptconv = nn.Conv2d(516,512,1,padding=0)
+
+    def forward(self, x):
+        self.in_channels, h, w = x.size(1), x.size(2), x.size(3)
+        self.layer1 = F.upsample(self.conv(self.pool1(x)), size=(h, w), mode='bilinear')
+        self.layer2 = F.upsample(self.conv(self.pool2(x)), size=(h, w), mode='bilinear')
+        self.layer3 = F.upsample(self.conv(self.pool3(x)), size=(h, w), mode='bilinear')
+        self.layer4 = F.upsample(self.conv(self.pool4(x)), size=(h, w), mode='bilinear')
+
+        out = torch.cat([self.layer1, self.layer2, self.layer3, self.layer4, x], 1)
+        out = self.addaptconv(out)
+
+        return out
+
+
 class BASNet(nn.Module):
     def __init__(self,n_channels):
         super(BASNet, self).__init__()
@@ -138,6 +187,9 @@ class BASNet(nn.Module):
         self.resb6_1 = BasicBlock(512, 512)
         self.resb6_2 = BasicBlock(512, 512)
         self.resb6_3 = BasicBlock(512, 512)  # 7
+
+        self.dblock = DACblock(512)
+        self.spp = SPPblock(512)
 
         ## -------------Bridge--------------
 
@@ -250,7 +302,7 @@ class BASNet(nn.Module):
         self.outconv1 = nn.Conv2d(64, 1, 3, padding=1)
 
         ## -------------Refine Module-------------
-        self.refunet = RefUnet(1, 64)
+        # self.refunet = RefUnet(1, 64)
 
 
     def forward(self, x):
@@ -275,6 +327,9 @@ class BASNet(nn.Module):
         hx = self.resb6_1(hx)
         hx = self.resb6_2(hx)
         h6 = self.resb6_3(hx)
+
+        h6 = self.dblock(h6)
+        h6 = self.spp(h6)
 
         ## -------------Bridge-------------
         hx = self.relubg_1(self.bnbg_1(self.convbg_1(h6)))  # 8
@@ -339,6 +394,6 @@ class BASNet(nn.Module):
         d1 = self.outconv1(hd1)  # 256
 
         ## -------------Refine Module-------------
-        dout = self.refunet(d1)  # 256
+        # dout = self.refunet(d1)  # 256
 
-        return F.sigmoid(dout), F.sigmoid(d1), F.sigmoid(d2), F.sigmoid(d3), F.sigmoid(d4), F.sigmoid(d5), F.sigmoid(d6), F.sigmoid(db)
+        return F.sigmoid(d1)
